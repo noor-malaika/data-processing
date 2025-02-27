@@ -1,10 +1,13 @@
 ###NOTE: This script uses a lot of indexing, couldn't be understood without references (CBUSH_FORCE_SPC.nas, FYP_model.nas)
 """spc and force components r same everywhere, don't need to read them for all variants"""
+from itertools import combinations
 import copy
+
 class ReadRawData:
     def __init__(self):
         self.inputs = {}
         self.node = {}
+        self.edges = {}
         self.tria = {}
         self.rb2 = {}
         self.rb3 = {}
@@ -89,7 +92,100 @@ class ReadRawData:
         for nid in no_types:
             del self.node[nid]
 
-    def organize_data(self):
+    def create_edges_old(self):
+
+        # extracting edge features for trias
+        tria_edges = set()
+        for eid, data in self.tria.items():
+            self.edges[eid] = {}
+            nids = data['data'][1:]
+            temp_edges = list(combinations(nids, 2))
+            for i,edge in enumerate(temp_edges):
+                edge = tuple(sorted(edge))
+                if edge not in tria_edges:
+                    tria_edges.add(edge)
+                    self.edges[eid][i] = {}
+                    self.edges[eid][i]['edge'] = edge
+                    self.edges[eid][i]['edge_type'] = 'tria'
+        print(f"Tria edges: {len(tria_edges)}")
+
+        # edge feats for rb2
+        for eid, data in self.rb2.items():
+            self.edges[eid] = {}
+            master_id = data['data'][0]
+            slave_ids = data['data'][2:]
+            for i,sl_id in enumerate(slave_ids):
+                self.edges[eid][i] = {}
+                self.edges[eid][i]['edge'] = tuple([master_id, sl_id])
+                self.edges[eid][i]['edge_type'] = 'rb2'
+
+        # edge feats for rb3
+        for eid, data in self.rb3.items():
+            self.edges[eid] = {}
+            master_id = data['data'][0]
+            slave_ids = data['data'][4:]
+            for i,sl_id in enumerate(slave_ids):
+                self.edges[eid][i] = {}
+                self.edges[eid][i]['edge'] = tuple([master_id, sl_id])
+                self.edges[eid][i]['edge_type'] = 'rb3'
+
+    def create_edges(self):
+        """
+        Extracts edges from tria, rb2, and rb3 elements while ensuring correctness.
+        """
+        tria_edges = set()
+        self.edges = {}
+
+        # --- TRIA ELEMENTS ---
+        for eid, data in self.tria.items():
+            self.edges[eid] = {}
+            nids = data['data'][1:]
+
+            if len(nids) != 3:  # Ensure tria has exactly 3 nodes
+                raise(f"Warning: TRIA {eid} has incorrect node count: {len(nids)}")
+
+            temp_edges = list(combinations(nids, 2))  # All possible 2-node edges in tria
+            for i, edge in enumerate(temp_edges):
+                edge = tuple(sorted(edge))  # Sort to maintain consistency
+
+                if edge not in tria_edges:
+                    tria_edges.add(edge)  # Store unique edges
+                    self.edges[eid][i] = {'edge': edge, 'edge_type': 'tria'}
+
+        print(f"Total Unique Tria Edges: {len(tria_edges)}")
+
+        # --- RB2 ELEMENTS ---
+        for eid, data in self.rb2.items():
+            self.edges[eid] = {}
+            master_id = data['data'][0]
+            slave_ids = data['data'][2:]
+
+            if master_id is None or not slave_ids:  # Ensure data is valid
+                raise(f"Warning: RB2 {eid} has missing master/slave data")
+
+            for i, sl_id in enumerate(slave_ids):
+                self.edges[eid][i] = {'edge': (master_id, sl_id), 'edge_type': 'rb2'}
+
+        # --- RB3 ELEMENTS ---
+        for eid, data in self.rb3.items():
+            self.edges[eid] = {}
+            master_id = data['data'][0]
+            slave_ids = data['data'][4:]
+
+            if master_id is None or not slave_ids:  # Ensure data is valid
+                raise(f"Warning: RB3 {eid} has missing master/slave data")
+
+            for i, sl_id in enumerate(slave_ids):
+                self.edges[eid][i] = {'edge': (master_id, sl_id), 'edge_type': 'rb3'}
+
+        # --- FINAL VALIDATION ---
+        total_edges = sum(len(edges) for edges in self.edges.values())
+        print(f"Total Extracted Edges: {total_edges}")
+
+        # return self.edges  # Return edges for debugging if needed
+
+
+    def organize_node_features(self):
         """self.node dict
         {
             nid:{
@@ -99,6 +195,7 @@ class ReadRawData:
                 }
         }
         """
+        # assigning element types and thicknesses
 
         for eid,data in self.tria.items():
             data = data['data']
@@ -128,13 +225,16 @@ class ReadRawData:
             for nid in slave_nids:
                 self.node[nid]['type'] = 'rb3_slave'
 
+        # removing nodes which dont have any type - left with (tria, rb2, rb3)
         no_types = list(k for k,node in self.node.items() if 'type' not in node.keys())
         self.rm_nodes_with_no_types(no_types)
 
+        # initializing empty force and spc features for all nodes
         for nid in self.node.keys():
             self.node[nid]['spc'] = [0, 0, 0]
             self.node[nid]['force'] = [0, 0, 0]
 
+        # assigning the (specific nodes) spc and force values - based on extracted dicts
         for sub_id in self.spc.keys():
             node_copy = copy.deepcopy(self.node)
             for sid in self.spc[sub_id]:
@@ -148,34 +248,20 @@ class ReadRawData:
                     node_copy[nid]['force'] = force_data['force']
             self.inputs[sub_id] = node_copy
 
+        # adding displacements as nodal properties (y - output features)
         for sub_id in self.outputs.keys():
             for nid,disps in self.outputs[sub_id].items():
                 if nid in self.inputs[sub_id].keys():
                     self.inputs[sub_id][nid]['y'] = disps
 
-# r = ReadRawData()
-# t1 = "MAT1    31100012 210000.             0.3  7.85-9"
-# rb3 = ["RBE3    28949129           74002  123456      1.     1232885023428850273", 
-#       "+       2885026728850304288502292885027028850266288503032885023328850314",
-#       "+       2885027628850313288502392885031828850170288503342885022128850296",
-#       "+       2885033328850222288501812885021828850329288502782885021728850235",
-#       "+       2885017528850174288502062885016928850328288501802885022528850205",
-#       "+       2885024028850178288502482885022628850263288502472885021528850243",
-#       "+       2885028028850317288503202885024628850194288501772885021428850193",
-#       "+       2885027728850327288503322885029728850265288502282885029828850331",
-#       "+       2885024228850325288503192885033028850326288502532885020828850281",
-#       "+       288503012885026428850207288503112885030228850312"]
-# rid = r.read_rbe(rb3[0], "rb3")
-# for i in range(1,10):
-#     r.read_rbe(rb3[i], 'rb3', True, rid)
-# import numpy as np
-# print(r.rb3, len(np.unique(r.rb3[rid]['data'])))
-# spcadd = "SPCADD       805     900     905"
-# s1 = "SPC          900  604001       3      0."
-# s2 = "SPC          905  404000      12      0."
-# r.read_spc_subcase(spcadd, 'spc')
-# r.read_spc(s1, 'spc')
-# r.read_spc(s2, 'spc')
-# print(r.spc)
-# s3 = "SPC          906  424001      12      0."
-# r.read_spc(s3, 'spc')
+        # setting disp to 0 at nodes with spc - those are small (e.g. 10^-18)
+        for sub_id in self.spc.keys():
+            for sid in self.spc[sub_id]:
+                for nid,comps in self.spc[sub_id][sid].items():
+                    if nid in self.inputs[sub_id].keys():
+                        # ids to replace displacements which have spc constraints
+                        comp_ids = [int(comps[i]) - 1 if i < len(comps) and comps[i] else None for i in range(3)]
+                        # Update 'y' values based on comp_ids
+                        self.inputs[sub_id][nid]['y'] = [
+                            0 if i in comp_ids else self.inputs[sub_id][nid]['y'][i] for i in range(3)
+                        ]

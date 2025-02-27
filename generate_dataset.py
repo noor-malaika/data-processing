@@ -48,6 +48,8 @@ class ReadData(ReadRawData):
             elif re.match(r'^\s+(\d+)', line):
                 self.read_disp(line, sub_id)
 
+
+
 def main():
 
     geom = open("/home/sces55/Malaika/fyp/data_processing/Var_1/FYP_HAT_QL_Model_MN_01a.nas", 'r')
@@ -60,8 +62,8 @@ def main():
     reader.read_fem_file(fem)
     reader.read_constr_file(constr)
     reader.read_pch_file(pch)
-    reader.organize_data()
-    
+    reader.organize_node_features()
+    reader.create_edges()
     # from collections import Counter
     # Count nodes by type
     # type_counts = Counter(node['type'] for node in reader.node.values() if 'type' in node.keys())
