@@ -5,9 +5,9 @@ import copy
 
 class ReadRawData:
     def __init__(self):
-        self.inputs = {}
+        self.nodal_features = {}
         self.node = {}
-        self.edges = {}
+        self.edge_features = {}
         self.tria = {}
         self.rb2 = {}
         self.rb3 = {}
@@ -92,53 +92,12 @@ class ReadRawData:
         for nid in no_types:
             del self.node[nid]
 
-    def create_edges_old(self):
-
-        # extracting edge features for trias
+    def _create_tria_edges(self):
         tria_edges = set()
-        for eid, data in self.tria.items():
-            self.edges[eid] = {}
-            nids = data['data'][1:]
-            temp_edges = list(combinations(nids, 2))
-            for i,edge in enumerate(temp_edges):
-                edge = tuple(sorted(edge))
-                if edge not in tria_edges:
-                    tria_edges.add(edge)
-                    self.edges[eid][i] = {}
-                    self.edges[eid][i]['edge'] = edge
-                    self.edges[eid][i]['edge_type'] = 'tria'
-        print(f"Tria edges: {len(tria_edges)}")
-
-        # edge feats for rb2
-        for eid, data in self.rb2.items():
-            self.edges[eid] = {}
-            master_id = data['data'][0]
-            slave_ids = data['data'][2:]
-            for i,sl_id in enumerate(slave_ids):
-                self.edges[eid][i] = {}
-                self.edges[eid][i]['edge'] = tuple([master_id, sl_id])
-                self.edges[eid][i]['edge_type'] = 'rb2'
-
-        # edge feats for rb3
-        for eid, data in self.rb3.items():
-            self.edges[eid] = {}
-            master_id = data['data'][0]
-            slave_ids = data['data'][4:]
-            for i,sl_id in enumerate(slave_ids):
-                self.edges[eid][i] = {}
-                self.edges[eid][i]['edge'] = tuple([master_id, sl_id])
-                self.edges[eid][i]['edge_type'] = 'rb3'
-
-    def create_edges(self):
-        """
-        Extracts edges from tria, rb2, and rb3 elements while ensuring correctness.
-        """
-        tria_edges = set()
-        self.edges = {}
 
         # --- TRIA ELEMENTS ---
         for eid, data in self.tria.items():
-            self.edges[eid] = {}
+            self.edge_features[eid] = {}
             nids = data['data'][1:]
 
             if len(nids) != 3:  # Ensure tria has exactly 3 nodes
@@ -150,13 +109,14 @@ class ReadRawData:
 
                 if edge not in tria_edges:
                     tria_edges.add(edge)  # Store unique edges
-                    self.edges[eid][i] = {'edge': edge, 'edge_type': 'tria'}
+                    self.edge_features[eid][i] = {'edge': edge, 'edge_type': 'tria'}
 
         print(f"Total Unique Tria Edges: {len(tria_edges)}")
 
+    def _create_rb2_edges(self):
         # --- RB2 ELEMENTS ---
         for eid, data in self.rb2.items():
-            self.edges[eid] = {}
+            self.edge_features[eid] = {}
             master_id = data['data'][0]
             slave_ids = data['data'][2:]
 
@@ -164,11 +124,12 @@ class ReadRawData:
                 raise(f"Warning: RB2 {eid} has missing master/slave data")
 
             for i, sl_id in enumerate(slave_ids):
-                self.edges[eid][i] = {'edge': (master_id, sl_id), 'edge_type': 'rb2'}
+                self.edge_features[eid][i] = {'edge': (master_id, sl_id), 'edge_type': 'rb2'}
 
+    def _create_rb3_edges(self):
         # --- RB3 ELEMENTS ---
         for eid, data in self.rb3.items():
-            self.edges[eid] = {}
+            self.edge_features[eid] = {}
             master_id = data['data'][0]
             slave_ids = data['data'][4:]
 
@@ -176,27 +137,24 @@ class ReadRawData:
                 raise(f"Warning: RB3 {eid} has missing master/slave data")
 
             for i, sl_id in enumerate(slave_ids):
-                self.edges[eid][i] = {'edge': (master_id, sl_id), 'edge_type': 'rb3'}
+                self.edge_features[eid][i] = {'edge': (master_id, sl_id), 'edge_type': 'rb3'}
+
+    def create_edges(self):
+        """
+        Extracts edges from tria, rb2, and rb3 elements while ensuring correctness.
+        """
+
+        self._create_tria_edges()
+        self._create_rb2_edges()
+        self._create_rb3_edges()
 
         # --- FINAL VALIDATION ---
-        total_edges = sum(len(edges) for edges in self.edges.values())
+        total_edges = sum(len(edges) for edges in self.edge_features.values())
         print(f"Total Extracted Edges: {total_edges}")
 
-        # return self.edges  # Return edges for debugging if needed
+        # return self.edge_features  # Return edges for debugging if needed
 
-
-    def organize_node_features(self):
-        """self.node dict
-        {
-            nid:{
-                    'data': coords,
-                    'type': tria | rb2,rb3 (master,slave); 5 types
-                    'thickness': given for trias, undefined for rb2,rb3 master nodes
-                }
-        }
-        """
-        # assigning element types and thicknesses
-
+    def _add_tria_nodes(self):
         for eid,data in self.tria.items():
             data = data['data']
             pid = data[0]
@@ -205,6 +163,7 @@ class ReadRawData:
                 self.node[node_id]['type'] = 'tria'
                 self.node[node_id]['thickness'] = self.pshell[pid]['data'][1] # 2nd elements in data dict is thickness for pshell
 
+    def _add_rb2_nodes(self):
         ######### WARNING: what about their thickness
         # as slave nodes are part of shell , they have thickness defined thru trias
         for eid,data in self.rb2.items():
@@ -215,7 +174,8 @@ class ReadRawData:
             self.node[master_nid]['thickness'] = '0'
             for nid in slave_nids:
                 self.node[nid]['type'] = 'rb2_slave'
-        
+
+    def _add_rb3_nodes(self):
         for eid,data in self.rb3.items():
             slave_nids = data['data'][4:] # slave nodes
             master_nid =  data['data'][0]
@@ -225,10 +185,7 @@ class ReadRawData:
             for nid in slave_nids:
                 self.node[nid]['type'] = 'rb3_slave'
 
-        # removing nodes which dont have any type - left with (tria, rb2, rb3)
-        no_types = list(k for k,node in self.node.items() if 'type' not in node.keys())
-        self.rm_nodes_with_no_types(no_types)
-
+    def _add_spc_and_force(self):
         # initializing empty force and spc features for all nodes
         for nid in self.node.keys():
             self.node[nid]['spc'] = [0, 0, 0]
@@ -246,22 +203,59 @@ class ReadRawData:
                 nid = force_data['nid']
                 if nid in node_copy:  # Only apply force if node is valid
                     node_copy[nid]['force'] = force_data['force']
-            self.inputs[sub_id] = node_copy
+            self.nodal_features[sub_id] = node_copy
 
-        # adding displacements as nodal properties (y - output features)
-        for sub_id in self.outputs.keys():
-            for nid,disps in self.outputs[sub_id].items():
-                if nid in self.inputs[sub_id].keys():
-                    self.inputs[sub_id][nid]['y'] = disps
 
+    def _set_zero_disp_for_constrained_nodes(self):
         # setting disp to 0 at nodes with spc - those are small (e.g. 10^-18)
         for sub_id in self.spc.keys():
             for sid in self.spc[sub_id]:
                 for nid,comps in self.spc[sub_id][sid].items():
-                    if nid in self.inputs[sub_id].keys():
+                    if nid in self.nodal_features[sub_id].keys():
                         # ids to replace displacements which have spc constraints
                         comp_ids = [int(comps[i]) - 1 if i < len(comps) and comps[i] else None for i in range(3)]
                         # Update 'y' values based on comp_ids
-                        self.inputs[sub_id][nid]['y'] = [
-                            0 if i in comp_ids else self.inputs[sub_id][nid]['y'][i] for i in range(3)
+                        self.nodal_features[sub_id][nid]['y'] = [
+                            0 if i in comp_ids else self.nodal_features[sub_id][nid]['y'][i] for i in range(3)
                         ]
+
+
+    def _add_displacements_as_outputs(self):
+        # adding displacements as nodal properties (y - output features)
+        for sub_id in self.outputs.keys():
+            for nid,disps in self.outputs[sub_id].items():
+                if nid in self.nodal_features[sub_id].keys():
+                    self.nodal_features[sub_id][nid]['y'] = disps
+
+        self._set_zero_disp_for_constrained_nodes()
+
+
+    def create_node_features(self):
+        """self.node dict
+        {
+            nid:{
+                    'data': coords,
+                    'type': tria | rb2,rb3 (master,slave); 5 types
+                    'thickness': given for trias, undefined for rb2,rb3 master nodes
+                }
+        }
+        """
+        # assigning element types and thicknesses
+        self._add_tria_nodes()
+        self._add_rb2_nodes()
+        self._add_rb3_nodes()
+
+        # removing nodes which dont have any type - left with (tria, rb2, rb3)
+        no_types = list(k for k,node in self.node.items() if 'type' not in node.keys())
+        self.rm_nodes_with_no_types(no_types)
+
+        # adding spc and force to node features
+        self._add_spc_and_force()
+
+        # adding displacements for outputs
+        self._add_displacements_as_outputs()
+
+
+    def organize(self):
+        self.create_node_features()
+        self.create_edges()

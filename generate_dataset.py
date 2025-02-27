@@ -47,6 +47,13 @@ class ReadData(ReadRawData):
                 print(sub_id)
             elif re.match(r'^\s+(\d+)', line):
                 self.read_disp(line, sub_id)
+    
+    def read(self, geom_file, fem_file, constr_file, pch_file):
+        self.read_geom_file(geom_file)
+        self.read_fem_file(fem_file)
+        self.read_constr_file(constr_file)
+        self.read_pch_file(pch_file)
+        self.organize()
 
 
 
@@ -58,22 +65,7 @@ def main():
     pch = open("/home/sces55/Malaika/fyp/data_processing/Var_1/Var_1.pch", 'r')
 
     reader = ReadData()
-    reader.read_geom_file(geom)
-    reader.read_fem_file(fem)
-    reader.read_constr_file(constr)
-    reader.read_pch_file(pch)
-    reader.organize_node_features()
-    reader.create_edges()
-    # from collections import Counter
-    # Count nodes by type
-    # type_counts = Counter(node['type'] for node in reader.node.values() if 'type' in node.keys())
-
-    # Count nodes by thickness (ignoring None values)
-    # thickness_counts = Counter(node['thickness'] for node in reader.node.values() if 'thickness' in node.keys() and node['thickness'] != None)
-
-    # print("Nodes by Type:", type_counts)
-    # print("Nodes by Thickness:", thickness_counts)
-    # print("Nodes without type: ", no_types)
+    reader.read(geom, fem, constr, pch)
 
     return 0
 
