@@ -199,11 +199,10 @@ class ReadRawData:
                     dof_constraints = [int(i) for i in comps]  
                     for dof in dof_constraints:
                         node_copy[nid]['spc'][dof - 1] = 1
-            for force_id, force_data in self.force.items():
-                nid = force_data['nid']
-                if nid in node_copy:  # Only apply force if node is valid
-                    node_copy[nid]['force'] = force_data['force']
+            
             self.nodal_features[sub_id] = node_copy
+            force_node_id = self.force[sub_id]['nid']
+            self.nodal_features[sub_id][force_node_id]['force'] = self.force[sub_id]['force']
 
 
     def _set_zero_disp_for_constrained_nodes(self):
