@@ -2,4 +2,6 @@
 __pycache__
 results_v1_split/
 Var*
-
+hdf5_data/
+logs/
+.vscode/

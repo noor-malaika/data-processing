@@ -1,4 +1,8 @@
 import os
+import glob
+import subprocess as sp
+from itertools import combinations
+import logging
 def find_missing_numbers(sorted_sequence):
     """
     Finds missing numbers in a sorted sequence of integers.
@@ -25,18 +29,15 @@ paths = [int(path.split('_')[-1]) for path in paths]
 paths = sorted(paths)
 print(find_missing_numbers(paths))
 
-data_dir = "/home/sces55/Malaika/fyp/data_processing/results_v1_split/**/CBUSH*.nas"
-data_dir = "/home/sces55/Malaika/fyp/data_processing/results_v1_split/**/*.pch"
-import glob
-import subprocess as sp
-from itertools import combinations
-import logging
+data_dir = "/home/sces55/Malaika/fyp/data_processing/results_v1_split/**/FYP*.nas"
+# data_dir = "/home/sces55/Malaika/fyp/data_processing/results_v1_split/**/*.pch"
+
 
 logging.basicConfig(
     level=logging.DEBUG,  # Set the level to DEBUG to capture all logs
     format="%(asctime)s - %(levelname)s - %(message)s",  # Customize the log format
     handlers=[
-        logging.FileHandler("diff_punch_v1.log")  # Save logs to a file
+        logging.FileHandler("test_returncode.log")  # Save logs to a file
     ]
 )
 
