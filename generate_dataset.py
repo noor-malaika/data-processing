@@ -19,16 +19,12 @@ def main():
         logger.info(f"Processing variant: {variant}")
         try:
             geom, pch, constr, fem = get_files_from_var_dirs(base_dir, variant, logger)
-        except Exception as e:
-            logger.error(f"Error occured for {variant} - {e}")
-            continue
-        reader = Dataset(logger)
-        try:
+            reader = Dataset(logger)
             reader.read(geom, constr, fem, pch)
             reader.create_hdf5(data_file, variant)
         except Exception as e:
-            logger.exception(f"Error occurred while processing the dataset {e}")
-            return 1
+            logger.error(f"Error occured adding {variant} to Dataset - {e}")
+            continue
 
     data_file.close()
     logger.info("HDF5 file closed successfully.")
