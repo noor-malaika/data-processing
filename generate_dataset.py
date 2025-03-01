@@ -5,10 +5,10 @@ from data_to_hdf5 import Dataset
 
 
 def main():
-    
+
     logger = setup_logger()
     base_dir = "results_v1_split"
-    data_file =  h5py.File("hdf5_data/dataset.hdf5", "w")
+    data_file = h5py.File("hdf5_data/dataset.hdf5", "w")
     variants = next(os.walk(base_dir))[1]
 
     if not variants:
@@ -17,8 +17,11 @@ def main():
 
     for variant in variants:
         logger.info(f"Processing variant: {variant}")
-        geom, pch, constr, fem = get_files_from_var_dirs(base_dir, variant)
-
+        try:
+            geom, pch, constr, fem = get_files_from_var_dirs(base_dir, variant, logger)
+        except Exception as e:
+            logger.error(f"Error occured for {variant} - {e}")
+            continue
         reader = Dataset(logger)
         try:
             reader.read(geom, constr, fem, pch)
@@ -26,11 +29,12 @@ def main():
         except Exception as e:
             logger.exception(f"Error occurred while processing the dataset {e}")
             return 1
-    
+
     data_file.close()
     logger.info("HDF5 file closed successfully.")
 
     return 0
+
 
 if __name__ == "__main__":
     main()
