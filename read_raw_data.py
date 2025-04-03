@@ -1,6 +1,6 @@
 ###NOTE: This script uses a lot of indexing, couldn't be understood without references (CBUSH_FORCE_SPC.nas, FYP_model.nas)
 from itertools import combinations
-from dataset_utils import fix_scientific_notation
+from utils import fix_scientific_notation
 import traceback
 import copy
 

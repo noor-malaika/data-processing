@@ -1,14 +1,15 @@
 import os
 import h5py
-from dataset_utils import get_files_from_var_dirs, setup_logger
-from data_to_hdf5 import Dataset
+from utils import get_files_from_var_dirs, setup_logger
+from dataset import Dataset
 
 
 def main():
 
-    logger = setup_logger()
-    base_dir = "results_v1_split"
-    data_file = h5py.File("hdf5_data/dataset.hdf5", "w")
+    logger = setup_logger("new_part_split_trias")
+    base_dir = "new_part_split_trias"
+    hdf5_name = "new_part_split_trias"
+    data_file = h5py.File(f"hdf5_data/{hdf5_name}.hdf5", "a")
     variants = next(os.walk(base_dir))[1]
 
     if not variants:

@@ -1,2 +1,0 @@
-The following variants are missing:
-[460, 688, 1553, 1811, 2545, 2961, 3006, 3270, 3382, 3677]
